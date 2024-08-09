@@ -1,5 +1,5 @@
 #### python -m venv libenv
-#### venv\Scripts\activate
+#### libenv\Scripts\activate
 #### pip install -r requirements.txt
 
 #### python setup.py sdist bdist_wheel  
