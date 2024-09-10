@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 import codecs
 import os
 
-VERSION = '0.0.4'
+VERSION = '0.0.5'
 DESCRIPTION = 'This is used for analyzing the obtain from IoT AirQo devices'
 # LONG_DESCRIPTION = 'This uses data from IoT AirQo devices to analyze the data and provide insights like sensor health, device uptime, data completeness, etc.'
 

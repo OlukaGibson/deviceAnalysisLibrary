@@ -129,7 +129,7 @@ def create_dates(start, end):
     # freq = 'W'
     # if days_between <= 7:
     #     freq = 'D'
-    # Parse the input dates
+    # Parse the input dates   
     start_date = pd.to_datetime(start)
     end_date = pd.to_datetime(end)
 
@@ -137,8 +137,14 @@ def create_dates(start, end):
     if start_date > end_date:
         start_date, end_date = end_date, start_date
 
-    # Generate the date range with weekly frequency
-    date_range = pd.date_range(start=start_date, end=end_date, freq='W')
+    days_between_df_dates = calculate_days_between(start, end)
+    if days_between_df_dates <= 30:
+      # Generate the date range with weekly frequency
+      date_range = pd.date_range(start=start_date, end=end_date, freq='D')
+    
+    else:
+      # Generate the date range with weekly frequency
+      date_range = pd.date_range(start=start_date, end=end_date, freq='W')
 
     # Create a DataFrame with the generated date range
     df = pd.DataFrame(date_range, columns=['Date'])

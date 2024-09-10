@@ -1,3 +1,4 @@
+README.md
 setup.py
 airqloudanalysis/__init__.py
 airqloudanalysis/airqoairqloudanalysis.py
