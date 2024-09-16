@@ -177,6 +177,118 @@ def lastUrl(ID, key):
 
 
 """## DataFrame airqloud formation"""
+"""## by API"""
+baseApiURL = "https://api.airqo.net/api/v2/devices"
+
+def getDeviceData(token):
+  url = f"{baseApiURL}?token={token}"
+  response = requests.request("GET", url)
+  print(response.json())
+  return response.json()
+#getDeviceData("your_token")
+
+def getSiteData(token):
+  url = str(baseApiURL) + "/metadata/grids?token=" + str(token)
+  response = requests.request("GET", url)
+  print(response.json())
+  return response.json()
+#getSiteData("your_token")
+
+def decryptData(token, data):
+    url = f"{baseApiURL}/decrypt/bulk?token={token}"
+
+    response = requests.post(url, json=data)
+
+    if response.status_code == 200:
+        print(response.json())
+        return response.json()
+    else:
+        print(f"Error: {response.status_code}, {response.text}")
+        return None
+#decryptData("your_token", "your_data")
+
+def processSiteData(token):
+    # Fetch site data
+    site_data = getSiteData(token)
+
+    if site_data.get('success') and 'grids' in site_data:
+        grids = site_data['grids']
+        data = [{"name": grid["name"], "admin_level": grid["admin_level"]} for grid in grids]
+
+        df = pd.DataFrame(data)
+        grouped_df = df.groupby('admin_level').apply(lambda x: x[['name']].reset_index(drop=True))
+
+        return grouped_df
+    else:
+        print("Error: No grids data available")
+        return pd.DataFrame()
+#grouped_df=processSiteData("your_token")
+
+def airqloudlist_api(token, airQlouds):
+    device_data = getDeviceData(token)
+
+    data_list = []
+
+    if device_data.get("success"):
+        devices = device_data.get("devices", [])
+
+        # Process each device  "category": "lowcost",
+        for device in devices:
+          if device.get("category") == "lowcost" or device.get("category") == None:
+            long_name = device.get("long_name")
+            device_number = device.get("device_number")
+            readKey = device.get("readKey")
+
+            # Process each grid entry within a device
+            for grid in device.get("grids", []):
+                grid_id = grid.get("_id")
+                grid_name = grid.get("name")
+                admin_level = grid.get("admin_level")
+
+                for airQloud in airQlouds:
+                  if airQloud in grid_name:
+                    #AirQloud Append the processed data to the list
+                    data_list.append({
+                        "Device Number": long_name,
+                        "Device ID": str(device_number) if device_number is not None else None,
+                        "Read Key": readKey,
+                        "grid_id": grid_id,
+                        "grid_name": grid_name,
+                        "admin_level": admin_level
+                    })
+    else:
+        print("Error fetching device data")
+
+    df = pd.DataFrame(data_list)
+    df = df.dropna(subset=["Device ID"])
+    df = df.dropna(subset=["Read Key"])
+
+    # Data encryption
+    encryption_data = []
+    for _, row in df.iterrows():
+        encryption_data.append({
+            "encrypted_key": row["Read Key"],
+            "device_number": int(row["Device ID"])
+        })
+
+    # Decrypt the read keys
+    decrypted_data = decryptData(token, encryption_data)
+
+    if decrypted_data and decrypted_data.get('decrypted_keys'):
+        decrypted_keys = [decrypted.get('decrypted_key') for decrypted in decrypted_data['decrypted_keys']]
+
+        if len(decrypted_keys) == len(df):
+            df["Decrypted Read Key"] = decrypted_keys
+        else:
+            print("Mismatch between decrypted keys and DataFrame length")
+
+    df = df.drop(columns=["Read Key"])
+    df = df.rename(columns={"Decrypted Read Key": "Read Key", "grid_name":"AirQloud", "grid_id" : "AirQloud ID", "admin_level" : "AirQloud Type"})
+
+    return df
+# df = airqloudlist_api(token)
+
+"""## by google drive"""
 def airqloudlist(filepath, excelfile, airQlouds, deviceNames):
   dfs = []
   # Check if both lists are empty
@@ -1811,4 +1923,4 @@ def airQloud_completeness(df,start , end, AQData, airQlouds, deviceNames):
 
 """# Done"""
 print("Powered by: AirQo")
-print("Made by Gibson")
+# print("Made by Gibson")
