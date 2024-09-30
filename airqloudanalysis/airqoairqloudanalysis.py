@@ -124,27 +124,40 @@ def calculate_days_between(start, end):
 #calculate_days_between(start, end)
 
 def create_dates(start, end):
-    # calculate the time between
-    # days_between = calculate_days_between(start, end)
-    # freq = 'W'
-    # if days_between <= 7:
-    #     freq = 'D'
     # Parse the input dates   
     start_date = pd.to_datetime(start)
     end_date = pd.to_datetime(end)
 
-    # Ensure start_date is before end_date
-    if start_date > end_date:
-        start_date, end_date = end_date, start_date
-
     days_between_df_dates = calculate_days_between(start, end)
-    if days_between_df_dates <= 30:
-      # Generate the date range with weekly frequency
-      date_range = pd.date_range(start=start_date, end=end_date, freq='D')
-    
-    else:
-      # Generate the date range with weekly frequency
-      date_range = pd.date_range(start=start_date, end=end_date, freq='W')
+    for i in range(8, 0, -1):#range
+      # Dictionary of conditions and corresponding frequencies
+      conditions = {
+          8: '8D',
+          7: 'W',
+          6: '6D',
+          5: '5D',
+          4: '4D',
+          3: '3D',
+          2: '2D'
+        }
+
+      # Iterate over the conditions
+      for i, freq in conditions.items():
+        if days_between_df_dates % i == 0:
+          date_range = pd.date_range(start=start_date, end=end_date, freq=freq)
+          print(i)
+          break
+        else:
+          if days_between_df_dates >= 30:
+            date_range = pd.date_range(start=start_date, end=end_date, freq='W')
+            print('20')
+            break
+          else:
+            # Default case if no condition matches
+            date_range = pd.date_range(start=start_date, end=end_date, freq='D')
+            print('default')
+            # break
+
 
     # Create a DataFrame with the generated date range
     df = pd.DataFrame(date_range, columns=['Date'])
@@ -158,7 +171,8 @@ def create_dates(start, end):
         last_date_in_df=0
 
     return df, days_between_df_dates, first_date_in_df, last_date_in_df
-# create_dates(start, end)
+# df, days_between_df_dates, first_date_in_df, last_date_in_df = create_dates(start, end)
+
 
 
 """## URL functions"""
