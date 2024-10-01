@@ -129,22 +129,40 @@ def create_dates(start, end):
     # freq = 'W'
     # if days_between <= 7:
     #     freq = 'D'
-    # Parse the input dates   
+    # Parse the input dates
     start_date = pd.to_datetime(start)
     end_date = pd.to_datetime(end)
 
-    # Ensure start_date is before end_date
-    if start_date > end_date:
-        start_date, end_date = end_date, start_date
-
     days_between_df_dates = calculate_days_between(start, end)
-    if days_between_df_dates <= 30:
-      # Generate the date range with weekly frequency
-      date_range = pd.date_range(start=start_date, end=end_date, freq='D')
-    
-    else:
-      # Generate the date range with weekly frequency
-      date_range = pd.date_range(start=start_date, end=end_date, freq='W')
+    for i in range(8, 0, -1):#range
+      # Dictionary of conditions and corresponding frequencies
+      conditions = {
+          8: '8D',
+          7: 'W',
+          6: '6D',
+          5: '5D',
+          4: '4D',
+          3: '3D',
+          2: '2D'
+        }
+
+      # Iterate over the conditions
+      for i, freq in conditions.items():
+        if days_between_df_dates % i == 0:
+          date_range = pd.date_range(start=start_date, end=end_date, freq=freq)
+          print(i)
+          break
+        else:
+          if days_between_df_dates >= 30:
+            date_range = pd.date_range(start=start_date, end=end_date, freq='W')
+            print('20')
+            break
+          else:
+            # Default case if no condition matches
+            date_range = pd.date_range(start=start_date, end=end_date, freq='D')
+            print('default')
+            # break
+
 
     # Create a DataFrame with the generated date range
     df = pd.DataFrame(date_range, columns=['Date'])
@@ -158,7 +176,7 @@ def create_dates(start, end):
         last_date_in_df=0
 
     return df, days_between_df_dates, first_date_in_df, last_date_in_df
-# create_dates(start, end)
+# df, days_between_df_dates, first_date_in_df, last_date_in_df = create_dates(start, end)
 
 
 """## URL functions"""
@@ -559,6 +577,32 @@ def print_devices_with_time_diff_flag_zero(df, airQlouds, deviceNames):
 # print_devices_with_time_diff_flag_zero(summary_df, airQlouds, deviceNames)
 
 
+def print_devices_with_time_diff_flag_zero_api(df, airQlouds, deviceNames):
+    # Check if both lists are populated
+    if len(airQlouds) > 0 and len(deviceNames) > 0:
+        return "airQlouds and deviceNames cannot both have data"
+
+    # Ensure df is a DataFrame
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("df must be a pandas DataFrame")
+
+    # Filter the DataFrame to only include rows where Time Difference Flag is 0
+    filtered_df = df[df['Time Difference Flag'] == 0]
+
+    if len(airQlouds) > 0:
+        # Filter for specific AirQlouds
+        airQloud_filtered_df = filtered_df[filtered_df['AirQloud'].isin(airQlouds)]
+        return airQloud_filtered_df[['AirQloud', 'Device Number']].drop_duplicates()
+
+    elif len(deviceNames) > 0:
+        # Filter for specific Device Names
+        device_filtered_df = filtered_df[filtered_df['Device Number'].isin(deviceNames)]
+        return device_filtered_df[['AirQloud', 'Device Number']].drop_duplicates()
+
+    else:
+        return "Either airQlouds or deviceNames must have data"
+# off_devices = print_devices_with_time_diff_flag_zero_api(summary_df, airQlouds, deviceNames)
+
 """## CSV export for the summary"""
 def export_summary_csv(summary_df, output_file, airQlouds, deviceNames):
     # Check if both lists are empty
@@ -632,6 +676,74 @@ def export_summary_csv(summary_df, output_file, airQlouds, deviceNames):
 # output_file = 'summary.csv'
 # summary_grouped = export_summary_csv(summary_df, output_file, airQlouds, deviceNames)
 
+"""## CSV export for the summary"""
+def export_summary_csv_api(summary_df, airQlouds, deviceNames):
+    # Check if both lists are empty
+    if len(airQlouds) > 0 and len(deviceNames) > 0:
+      return "airQlouds and deviceNames  can not both have data"
+
+    # Ensure summary_df is a DataFrame
+    if not isinstance(summary_df, pd.DataFrame):
+        raise ValueError("summary_df must be a pandas DataFrame")
+
+    # Group by AirQloud or device Number and calculate the required metrics
+    if len(airQlouds) > 0:
+      summary_grouped = summary_df.groupby('AirQloud').agg(
+        Off=('Time Difference Flag', lambda x: (x == 0).sum()),
+        On=('Time Difference Flag', lambda x: (x == 1).sum()),
+        Uptime=('Average Uptime', lambda x: round((x.mean() / 24) * 100, 2)),
+        Average_Sensor_Error=('Average Sensor Error', lambda x: round(x.mean(), 2)),
+        Completeness=('Average Completeness', lambda x: round(x.mean(), 2)),
+        Optimal=('Optimal Completeness', 'mean'),
+        Good=('Good Completeness', 'mean'),
+        Fair=('Fair Completeness', 'mean'),
+        Poor=('Poor Completeness', 'mean')
+      ).reset_index()
+
+    elif len(deviceNames) > 0:
+      summary_grouped = summary_df.groupby('Device Number').agg(
+        Uptime=('Average Uptime', lambda x: round((x.mean() / 24) * 100, 2)),
+        Off=('Time Difference Flag', lambda x: (x == 0).sum()),
+        On=('Time Difference Flag', lambda x: (x == 1).sum()),
+        Average_Sensor_Error=('Average Sensor Error', lambda x: round(x.mean(), 2)),
+        Completeness=('Average Completeness', lambda x: round(x.mean(), 2)),
+        Optimal=('Optimal Completeness', 'mean'),
+        Good=('Good Completeness', 'mean'),
+        Fair=('Fair Completeness', 'mean'),
+        Poor=('Poor Completeness', 'mean')
+      ).reset_index()
+
+    else:
+      return "either airQlouds or deviceNames must have data"
+
+    # Calculate the Total Completeness as the sum of means of Optimal, Good, Fair, and Poor
+    summary_grouped['Total Completeness'] = (
+        summary_grouped['Optimal'] +
+        summary_grouped['Good'] +
+        summary_grouped['Fair'] +
+        summary_grouped['Poor']
+    )
+
+    # Convert Optimal, Good, Fair, and Poor to percentages of the Total Completeness
+    summary_grouped['Optimal'] = round((summary_grouped['Optimal'] / summary_grouped['Total Completeness']) * 100, 2)
+    summary_grouped['Good'] = round((summary_grouped['Good'] / summary_grouped['Total Completeness']) * 100, 2)
+    summary_grouped['Fair'] = round((summary_grouped['Fair'] / summary_grouped['Total Completeness']) * 100, 2)
+    summary_grouped['Poor'] = round((summary_grouped['Poor'] / summary_grouped['Total Completeness']) * 100, 2)
+
+    summary_grouped = summary_grouped.drop(columns=['Total Completeness'])
+    summary_grouped = summary_grouped.rename(columns={
+        'Off': 'Devices Off',
+        'On': 'Devices On',
+        'Completeness': 'Hourly Completeness',
+        'Optimal': 'Optimal Completeness (%)',
+        'Good': 'Good Completeness (%)',
+        'Fair': 'Fair Completeness (%)',
+        'Poor': 'Poor Completeness (%)'
+        })
+    summary_grouped.fillna(0, inplace=True)
+
+    return summary_grouped
+# summary_grouped = export_summary_csv_api(summary_df, airQlouds, deviceNames)
 
 """## Average device uptime over period"""
 def plot_uptime_by_device(summary_df):
@@ -649,6 +761,18 @@ def plot_uptime_by_device(summary_df):
     fig.update_layout(height=600, width=1200, showlegend=False,)
     fig.show(renderer='colab')
 # plot_uptime_by_device(summary_df)
+
+def plot_uptime_by_device_api(summary_df):
+    if not isinstance(summary_df, pd.DataFrame):
+        raise ValueError("summary_df must be a pandas DataFrame")
+
+    uptime_data = summary_df.groupby('Device Number').agg(
+        Uptime=('Average Uptime', lambda x: round((x.mean() / 24) * 100, 2))
+    ).reset_index()
+
+    return uptime_data
+# uptime_data = plot_uptime_by_device_api(summary_df)
+
 
 
 """## Uptime
@@ -977,8 +1101,79 @@ def plot_weekly_completness(pivot_table, airQlouds, deviceNames):
 
 """# Device specifics
  This shows the specific details of the each of the selected devices selected
+"""
+def device_data_api(dataFrame, maintenenceDate):
+    # Ensure the 'created_at' column is in datetime format and timezone-aware
+    dataFrame['created_at'] = pd.to_datetime(dataFrame['created_at']).dt.tz_localize(None)
 
-## Sensor health
+    # Convert maintenanceDate to datetime if it's not already
+    maintenenceDate = pd.to_datetime(maintenenceDate)
+
+    # Initialize an empty list to store the result data
+    results = []
+
+    # Extract unique device numbers
+    deviceNumbers = dataFrame['Device Number'].unique()
+
+    for deviceNumber in deviceNumbers:
+        # Filter data for the current device
+        device_df = dataFrame[dataFrame['Device Number'] == deviceNumber]
+
+        # Data before maintenance
+        before_df = device_df[device_df['created_at'] <= maintenenceDate][['Device Number', 'created_at', 'Sensor1 PM2.5_CF_1_ug/m3', 'Sensor2 PM2.5_CF_1_ug/m3', 'Battery Voltage', 'AirQloud', 'AirQloud ID', 'AirQloud Type']]
+        before_df['Status'] = 'Before'
+
+        # Data after maintenance
+        after_df = device_df[device_df['created_at'] > maintenenceDate][['Device Number', 'created_at', 'Sensor1 PM2.5_CF_1_ug/m3', 'Sensor2 PM2.5_CF_1_ug/m3', 'Battery Voltage', 'AirQloud', 'AirQloud ID', 'AirQloud Type']]
+        after_df['Status'] = 'After'
+
+        # Append both before and after data to the results
+        results.append(before_df)
+        results.append(after_df)
+
+    # Concatenate the results into a single DataFrame
+    result_df = pd.concat(results, ignore_index=True)
+
+    return result_df
+# device_data_apiss = device_data_api(final_df, maintenenceDate)
+
+
+def sensors_api(dataFrame, maintenenceDate):
+    # Ensure the 'created_at' column is in datetime format and timezone-aware
+    dataFrame['created_at'] = pd.to_datetime(dataFrame['created_at']).dt.tz_localize(None)
+
+    # Convert maintenanceDate to datetime if it's not already
+    maintenenceDate = pd.to_datetime(maintenenceDate)
+
+    # Initialize an empty list to store the result data
+    results = []
+
+    # Extract unique device numbers
+    deviceNumbers = dataFrame['Device Number'].unique()
+
+    for deviceNumber in deviceNumbers:
+        # Filter data for the current device
+        device_df = dataFrame[dataFrame['Device Number'] == deviceNumber]
+
+        # Data before maintenance
+        before_df = device_df[device_df['created_at'] <= maintenenceDate][['Device Number', 'created_at', 'Sensor1 PM2.5_CF_1_ug/m3', 'Sensor2 PM2.5_CF_1_ug/m3']]
+        before_df['Status'] = 'Before'
+
+        # Data after maintenance
+        after_df = device_df[device_df['created_at'] > maintenenceDate][['Device Number', 'created_at', 'Sensor1 PM2.5_CF_1_ug/m3', 'Sensor2 PM2.5_CF_1_ug/m3']]
+        after_df['Status'] = 'After'
+
+        # Append both before and after data to the results
+        results.append(before_df)
+        results.append(after_df)
+
+    # Concatenate the results into a single DataFrame
+    result_df = pd.concat(results, ignore_index=True)
+    
+    return result_df
+# regSensor_correlation_apiss = sensors_api(final_df, maintenenceDate)
+
+"""## Sensor health
 
 ### Regplot/Scatterplot
 
@@ -990,6 +1185,7 @@ To do:
 
 Regression + R Squared value on the hover text
 Size of the markers"""
+
 def regSensor_correlation(dataFrame, maintenenceDate):
     # Extract unique device numbers
     deviceNumbers = dataFrame['Device Number'].unique()
@@ -1923,4 +2119,4 @@ def airQloud_completeness(df,start , end, AQData, airQlouds, deviceNames):
 
 """# Done"""
 print("Powered by: AirQo")
-# print("Made by Gibson")
+print("API enabled")
