@@ -113,62 +113,52 @@ def preprocessing(data):
 """## Create the weekly data"""
 def calculate_days_between(start, end):
     # Convert the date strings to datetime objects
-    start_date = datetime.datetime.strptime(start, '%Y-%m-%d')  # Now use datetime.strptime correctly
+    start_date = datetime.datetime.strptime(start, '%Y-%m-%d')
     end_date = datetime.datetime.strptime(end, '%Y-%m-%d')
 
     # Calculate the difference in days
-    delta =  end_date - start_date
+    delta = end_date - start_date
 
     # Return the difference in days
     return delta.days
-#calculate_days_between(start, end)
 
 def create_dates(start, end):
     # Parse the input dates   
     start_date = pd.to_datetime(start)
     end_date = pd.to_datetime(end)
 
-    days_between_df_dates = calculate_days_between(start, end)
-    for i in range(8, 0, -1):#range
-      # Dictionary of conditions and corresponding frequencies
-      conditions = {
-          8: '8D',
-          7: 'W',
-          6: '6D',
-          5: '5D',
-          4: '4D',
-          3: '3D',
-          2: '2D'
-        }
+    # Calculate the total number of days between the start and end dates
+    total_days = calculate_days_between(start, end)
 
-      # Iterate over the conditions
-      for i, freq in conditions.items():
-        if days_between_df_dates % i == 0:
-          date_range = pd.date_range(start=start_date, end=end_date, freq=freq)
-          print(i)
-          break
-        else:
-          if days_between_df_dates >= 30:
-            date_range = pd.date_range(start=start_date, end=end_date, freq='W')
-            print('20')
-            break
-          else:
-            # Default case if no condition matches
-            date_range = pd.date_range(start=start_date, end=end_date, freq='D')
-            print('default')
-            # break
-
+    # Calculate how many full 8-day intervals fit, and the remainder
+    full_intervals = total_days // 8
+    remainder = total_days % 8
+    
+    # Generate the main part of the date range with '8D' frequency
+    if full_intervals > 0:
+        main_range = pd.date_range(start=start_date, periods=full_intervals + 1, freq='8D')
+    else:
+        main_range = pd.Series([start_date])
+    
+    # Handle the remainder: create the final date as `start_date + total_days` and append
+    if remainder > 0:
+        last_date = start_date + pd.Timedelta(days=total_days)
+        full_range = pd.concat([pd.Series(main_range), pd.Series([last_date])], ignore_index=True)
+    else:
+        full_range = pd.Series(main_range)
 
     # Create a DataFrame with the generated date range
-    df = pd.DataFrame(date_range, columns=['Date'])
+    df = pd.DataFrame(full_range, columns=['Date'])
+    
+    # Recalculate the number of days between the first and last date in the DataFrame
     if not df.empty:
-        first_date_in_df = df['Date'].iloc[0].strftime('%Y-%m-%d') # Convert to string for calculate_days_between
-        last_date_in_df = df['Date'].iloc[-1].strftime('%Y-%m-%d') # Convert to string for calculate_days_between
+        first_date_in_df = df['Date'].iloc[0].strftime('%Y-%m-%d')
+        last_date_in_df = df['Date'].iloc[-1].strftime('%Y-%m-%d')
         days_between_df_dates = calculate_days_between(first_date_in_df, last_date_in_df)
     else:
         days_between_df_dates = 0
-        first_date_in_df=0
-        last_date_in_df=0
+        first_date_in_df = start
+        last_date_in_df = end
 
     return df, days_between_df_dates, first_date_in_df, last_date_in_df
 # df, days_between_df_dates, first_date_in_df, last_date_in_df = create_dates(start, end)
@@ -197,14 +187,14 @@ baseApiURL = "https://api.airqo.net/api/v2/devices"
 def getDeviceData(token):
   url = f"{baseApiURL}?token={token}"
   response = requests.request("GET", url)
-  print(response.json())
+  # print(response.json())
   return response.json()
 #getDeviceData("your_token")
 
 def getSiteData(token):
   url = str(baseApiURL) + "/metadata/grids?token=" + str(token)
   response = requests.request("GET", url)
-  print(response.json())
+  # print(response.json())
   return response.json()
 #getSiteData("your_token")
 
@@ -214,7 +204,7 @@ def decryptData(token, data):
     response = requests.post(url, json=data)
 
     if response.status_code == 200:
-        print(response.json())
+        # print(response.json())
         return response.json()
     else:
         print(f"Error: {response.status_code}, {response.text}")
@@ -389,15 +379,29 @@ def timeLastPost(df):
         readKey = row['Read Key']
         deviceID = row['Device ID']
         last = lastUrl(deviceID, readKey)
-        lastData = requests.get(last)
-        lastData = json.loads(lastData.text)
 
+        # Fetch data from the API
+        try:
+            lastData = requests.get(last)
+            lastData = lastData.json()
+        except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
+            print(f"Error fetching data for Device ID {deviceID}: {e}")
+            continue  # Skip to the next row
+
+        # Check if 'feeds' exists and is not empty
+        if 'feeds' not in lastData or not lastData['feeds']:
+            print(f"No data found in feeds for Device ID {deviceID}")
+            continue  # Skip to the next row
+
+        # Extract and parse the created_at timestamp
         created_at_str = lastData['feeds'][0]['created_at']
         created_at = datetime.datetime.strptime(created_at_str, '%Y-%m-%dT%H:%M:%SZ')
 
+        # Calculate time difference
         current_time = datetime.datetime.utcnow()
         time_difference = current_time - created_at
 
+        # Flag based on time difference
         time_diff_flag = 1 if time_difference < datetime.timedelta(days=1) else 0
 
         results.append({
@@ -572,46 +576,69 @@ def print_devices_with_time_diff_flag_zero(df, airQlouds, deviceNames):
       return "either airQlouds or deviceNames must have data"
 # print_devices_with_time_diff_flag_zero(summary_df, airQlouds, deviceNames)
 
+def print_devices_with_time_diff_flag_zero_api(df, airQlouds, deviceNames):
+    # Check if both lists are populated
+    if len(airQlouds) > 0 and len(deviceNames) > 0:
+        return "airQlouds and deviceNames cannot both have data"
+    # Ensure df is a DataFrame
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("df must be a pandas DataFrame")
+    # Filter the DataFrame to only include rows where Time Difference Flag is 0
+    filtered_df = df[df['Time Difference Flag'] == 0]
+    if len(airQlouds) > 0:
+        # Filter for specific AirQlouds
+        airQloud_filtered_df = filtered_df[filtered_df['AirQloud'].isin(airQlouds)]
+        return airQloud_filtered_df[['AirQloud', 'Device Number']].drop_duplicates()
+    elif len(deviceNames) > 0:
+        # Filter for specific Device Names
+        device_filtered_df = filtered_df[filtered_df['Device Number'].isin(deviceNames)]
+        return device_filtered_df[['AirQloud', 'Device Number']].drop_duplicates()
+    else:
+        return "Either airQlouds or deviceNames must have data"
+# off_devices = print_devices_with_time_diff_flag_zero_api(summary_df, airQlouds, deviceNames)
 
 """## CSV export for the summary"""
 def export_summary_csv(summary_df, output_file, airQlouds, deviceNames):
     # Check if both lists are empty
     if len(airQlouds) > 0 and len(deviceNames) > 0:
-      return "airQlouds and deviceNames  can not both have data"
+        return "airQlouds and deviceNames cannot both have data"
 
     # Ensure summary_df is a DataFrame
     if not isinstance(summary_df, pd.DataFrame):
         raise ValueError("summary_df must be a pandas DataFrame")
 
-    # Group by AirQloud or device Number and calculate the required metrics
+    # Fill NaN values in Average Uptime with 0
+    summary_df['Average Uptime'] = summary_df['Average Uptime'].fillna(0)
+
+    # Group by AirQloud or Device Number and calculate the required metrics
     if len(airQlouds) > 0:
-      summary_grouped = summary_df.groupby('AirQloud').agg(
-        Off=('Time Difference Flag', lambda x: (x == 0).sum()),
-        On=('Time Difference Flag', lambda x: (x == 1).sum()),
-        Uptime=('Average Uptime', lambda x: round((x.mean() / 24) * 100, 2)),
-        Average_Sensor_Error=('Average Sensor Error', lambda x: round(x.mean(), 2)),
-        Completeness=('Average Completeness', lambda x: round(x.mean(), 2)),
-        Optimal=('Optimal Completeness', 'mean'),
-        Good=('Good Completeness', 'mean'),
-        Fair=('Fair Completeness', 'mean'),
-        Poor=('Poor Completeness', 'mean')
-      ).reset_index()
+        summary_grouped = summary_df.groupby('AirQloud').agg(
+            Off=('Time Difference Flag', lambda x: (x == 0).sum()),
+            On=('Time Difference Flag', lambda x: (x == 1).sum()),
+            Uptime=('Average Uptime', lambda x: round((x.mean() / 24) * 100, 2)),
+            Average_Sensor_Error=('Average Sensor Error', lambda x: round(x.mean(), 2)),
+            Completeness=('Average Completeness', lambda x: round(x.mean(), 2)),
+            Optimal=('Optimal Completeness', 'mean'),
+            Good=('Good Completeness', 'mean'),
+            Fair=('Fair Completeness', 'mean'),
+            Poor=('Poor Completeness', 'mean')
+        ).reset_index()
 
     elif len(deviceNames) > 0:
-      summary_grouped = summary_df.groupby('Device Number').agg(
-        Uptime=('Average Uptime', lambda x: round((x.mean() / 24) * 100, 2)),
-        Off=('Time Difference Flag', lambda x: (x == 0).sum()),
-        On=('Time Difference Flag', lambda x: (x == 1).sum()),
-        Average_Sensor_Error=('Average Sensor Error', lambda x: round(x.mean(), 2)),
-        Completeness=('Average Completeness', lambda x: round(x.mean(), 2)),
-        Optimal=('Optimal Completeness', 'mean'),
-        Good=('Good Completeness', 'mean'),
-        Fair=('Fair Completeness', 'mean'),
-        Poor=('Poor Completeness', 'mean')
-      ).reset_index()
+        summary_grouped = summary_df.groupby('Device Number').agg(
+            Uptime=('Average Uptime', lambda x: round((x.mean() / 24) * 100, 2)),
+            Off=('Time Difference Flag', lambda x: (x == 0).sum()),
+            On=('Time Difference Flag', lambda x: (x == 1).sum()),
+            Average_Sensor_Error=('Average Sensor Error', lambda x: round(x.mean(), 2)),
+            Completeness=('Average Completeness', lambda x: round(x.mean(), 2)),
+            Optimal=('Optimal Completeness', 'mean'),
+            Good=('Good Completeness', 'mean'),
+            Fair=('Fair Completeness', 'mean'),
+            Poor=('Poor Completeness', 'mean')
+        ).reset_index()
 
     else:
-      return "either airQlouds or deviceNames must have data"
+        return "Either airQlouds or deviceNames must have data"
 
     # Calculate the Total Completeness as the sum of means of Optimal, Good, Fair, and Poor
     summary_grouped['Total Completeness'] = (
@@ -636,7 +663,7 @@ def export_summary_csv(summary_df, output_file, airQlouds, deviceNames):
         'Good': 'Good Completeness (%)',
         'Fair': 'Fair Completeness (%)',
         'Poor': 'Poor Completeness (%)'
-        })
+    })
     summary_grouped.fillna(0, inplace=True)
 
     # Export the summary DataFrame to a CSV file
@@ -646,6 +673,65 @@ def export_summary_csv(summary_df, output_file, airQlouds, deviceNames):
 # output_file = 'summary.csv'
 # summary_grouped = export_summary_csv(summary_df, output_file, airQlouds, deviceNames)
 
+def export_summary_csv_api(summary_df, airQlouds, deviceNames):
+    # Check if both lists are empty
+    if len(airQlouds) > 0 and len(deviceNames) > 0:
+      return "airQlouds and deviceNames  can not both have data"
+    # Ensure summary_df is a DataFrame
+    if not isinstance(summary_df, pd.DataFrame):
+        raise ValueError("summary_df must be a pandas DataFrame")
+    # Group by AirQloud or device Number and calculate the required metrics
+    if len(airQlouds) > 0:
+      summary_grouped = summary_df.groupby('AirQloud').agg(
+        Off=('Time Difference Flag', lambda x: (x == 0).sum()),
+        On=('Time Difference Flag', lambda x: (x == 1).sum()),
+        Uptime=('Average Uptime', lambda x: round((x.mean() / 24) * 100, 2)),
+        Average_Sensor_Error=('Average Sensor Error', lambda x: round(x.mean(), 2)),
+        Completeness=('Average Completeness', lambda x: round(x.mean(), 2)),
+        Optimal=('Optimal Completeness', 'mean'),
+        Good=('Good Completeness', 'mean'),
+        Fair=('Fair Completeness', 'mean'),
+        Poor=('Poor Completeness', 'mean')
+      ).reset_index()
+    elif len(deviceNames) > 0:
+      summary_grouped = summary_df.groupby('Device Number').agg(
+        Uptime=('Average Uptime', lambda x: round((x.mean() / 24) * 100, 2)),
+        Off=('Time Difference Flag', lambda x: (x == 0).sum()),
+        On=('Time Difference Flag', lambda x: (x == 1).sum()),
+        Average_Sensor_Error=('Average Sensor Error', lambda x: round(x.mean(), 2)),
+        Completeness=('Average Completeness', lambda x: round(x.mean(), 2)),
+        Optimal=('Optimal Completeness', 'mean'),
+        Good=('Good Completeness', 'mean'),
+        Fair=('Fair Completeness', 'mean'),
+        Poor=('Poor Completeness', 'mean')
+      ).reset_index()
+    else:
+      return "either airQlouds or deviceNames must have data"
+    # Calculate the Total Completeness as the sum of means of Optimal, Good, Fair, and Poor
+    summary_grouped['Total Completeness'] = (
+        summary_grouped['Optimal'] +
+        summary_grouped['Good'] +
+        summary_grouped['Fair'] +
+        summary_grouped['Poor']
+    )
+    # Convert Optimal, Good, Fair, and Poor to percentages of the Total Completeness
+    summary_grouped['Optimal'] = round((summary_grouped['Optimal'] / summary_grouped['Total Completeness']) * 100, 2)
+    summary_grouped['Good'] = round((summary_grouped['Good'] / summary_grouped['Total Completeness']) * 100, 2)
+    summary_grouped['Fair'] = round((summary_grouped['Fair'] / summary_grouped['Total Completeness']) * 100, 2)
+    summary_grouped['Poor'] = round((summary_grouped['Poor'] / summary_grouped['Total Completeness']) * 100, 2)
+    summary_grouped = summary_grouped.drop(columns=['Total Completeness'])
+    summary_grouped = summary_grouped.rename(columns={
+        'Off': 'Devices Off',
+        'On': 'Devices On',
+        'Completeness': 'Hourly Completeness',
+        'Optimal': 'Optimal Completeness (%)',
+        'Good': 'Good Completeness (%)',
+        'Fair': 'Fair Completeness (%)',
+        'Poor': 'Poor Completeness (%)'
+        })
+    summary_grouped.fillna(0, inplace=True)
+    return summary_grouped
+# summary_grouped = export_summary_csv_api(summary_df, airQlouds, deviceNames)
 
 """## Average device uptime over period"""
 def plot_uptime_by_device(summary_df):
@@ -664,6 +750,14 @@ def plot_uptime_by_device(summary_df):
     fig.show(renderer='colab')
 # plot_uptime_by_device(summary_df)
 
+def plot_uptime_by_device_api(summary_df):
+    if not isinstance(summary_df, pd.DataFrame):
+        raise ValueError("summary_df must be a pandas DataFrame")
+    uptime_data = summary_df.groupby('Device Number').agg(
+        Uptime=('Average Uptime', lambda x: round((x.mean() / 24) * 100, 2))
+    ).reset_index()
+    return uptime_data
+# uptime_data = plot_uptime_by_device_api(summary_df)
 
 """## Uptime
 ### Weekly uptime """
@@ -677,7 +771,8 @@ def calculate_daily_uptime_per_device(final_df, AQData, start, end):
     final_df.fillna(0, inplace=True)
 
     # Ensure 'created_at' is in datetime format
-    final_df['created_at'] = pd.to_datetime(final_df['created_at'], errors='coerce')
+    # final_df['created_at'] = pd.to_datetime(final_df['created_at'], errors='coerce')
+    final_df['created_at'] = pd.to_datetime(final_df['created_at'], errors='coerce', utc=True)
 
     # Extract date and hour from 'created_at'
     final_df['Date'] = final_df['created_at'].dt.date
@@ -1004,6 +1099,37 @@ To do:
 
 Regression + R Squared value on the hover text
 Size of the markers"""
+def device_data_api(dataFrame, maintenenceDate):
+    # Ensure the 'created_at' column is in datetime format and timezone-aware
+    dataFrame['created_at'] = pd.to_datetime(dataFrame['created_at']).dt.tz_localize(None)
+    # dataFrame['created_at'] = pd.to_datetime(dataFrame['created_at'], errors='coerce', utc=True)
+    # Convert maintenanceDate to datetime if it's not already
+    maintenenceDate = pd.to_datetime(maintenenceDate)
+    # Initialize an empty list to store the result data
+    results = []
+    # Extract unique device numbers
+    deviceNumbers = dataFrame['Device Number'].unique()
+    for deviceNumber in deviceNumbers:
+        # Filter data for the current device
+        device_df = dataFrame[dataFrame['Device Number'] == deviceNumber]
+        # Data before maintenance
+        before_df = device_df[device_df['created_at'] <= maintenenceDate][['Device Number', 'created_at', 'Sensor1 PM2.5_CF_1_ug/m3', 'Sensor2 PM2.5_CF_1_ug/m3', 'Battery Voltage', 'AirQloud', 'AirQloud ID', 'AirQloud Type']]
+        before_df['Status'] = 'Before'
+
+        ## Sensor health
+        # Data after maintenance
+        after_df = device_df[device_df['created_at'] > maintenenceDate][['Device Number', 'created_at', 'Sensor1 PM2.5_CF_1_ug/m3', 'Sensor2 PM2.5_CF_1_ug/m3', 'Battery Voltage', 'AirQloud', 'AirQloud ID', 'AirQloud Type']]
+        after_df['Status'] = 'After'
+        # Append both before and after data to the results
+        results.append(before_df)
+        results.append(after_df)
+    # Concatenate the results into a single DataFrame
+    result_df = pd.concat(results, ignore_index=True)
+    return result_df
+# device_data_apiss = device_data_api(final_df, maintenenceDate)
+
+
+
 def regSensor_correlation(dataFrame, maintenenceDate):
     # Extract unique device numbers
     deviceNumbers = dataFrame['Device Number'].unique()
@@ -1664,7 +1790,7 @@ def plot_data_completeness(dataFrame, end_date):
         fig.add_trace(trace, row=row, col=col)
 
         fig.update_xaxes(title_text='timestamp', row=row, col=col, tickangle=45)
-        fig.update_yaxes(title_text='Uptime (Hours)', row=row, col=col)
+        fig.update_yaxes(title_text='Hourly Count', row=row, col=col)
 
     fig.update_layout(height=300*num_rows, width=1200, showlegend=False)
 
