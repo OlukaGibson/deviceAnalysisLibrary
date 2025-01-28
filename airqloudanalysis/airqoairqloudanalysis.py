@@ -78,32 +78,41 @@ munits.registry[datetime.date] = converter
 """# Data initialisation functions
 ## Data processing"""
 #Function to preprocess the datasets from the API
-def preprocessing(data):
-    '''
-    Function to preprocess the datasets
-    '''
-    df = json_normalize(data['feeds'])
-
+def preprocessing(df):
+    # df.drop(columns=['field8'], inplace=True)
     # Convert str columns to float
-    df.drop(columns=['field8'], inplace=True)
     for col in ['field1', 'field2', 'field3', 'field4', 'field7']:
         df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    # Drop rows where any of the important columns have NaN values
     df = df.dropna(subset=["field1", "field2", "field3", "field4", "field7"])
 
-    df = df.rename(columns={"field1": "Sensor1 PM2.5_CF_1_ug/m3", "field2": "Sensor1 PM10_CF_1_ug/m3",
-                            "field3": "Sensor2 PM2.5_CF_1_ug/m3", "field4": "Sensor2 PM10_CF_1_ug/m3",
-                            "field5": "Latitude", "field6": "Longitude", "field7": "Battery Voltage"})
+    # Rename columns for clarity
+    df = df.rename(columns={
+        "field1": "Sensor1 PM2.5_CF_1_ug/m3",
+        "field2": "Sensor1 PM10_CF_1_ug/m3",
+        "field3": "Sensor2 PM2.5_CF_1_ug/m3",
+        "field4": "Sensor2 PM10_CF_1_ug/m3",
+        "field5": "Latitude",
+        "field6": "Longitude",
+        "field7": "Battery Voltage"
+    })
 
     # Datetime data preprocessing
-    df["Mean PM2.5"] = (df["Sensor1 PM2.5_CF_1_ug/m3"] + df["Sensor1 PM2.5_CF_1_ug/m3"]) / 2
-    df["Mean PM10"] = (df["Sensor1 PM10_CF_1_ug/m3"] + df["Sensor1 PM10_CF_1_ug/m3"]) / 2
-    # To local time
-    df['created_at'] = df['created_at'].apply(lambda x: parser.parse(x))  # str to datetime type
-
-    df['created_at'] = pd.to_datetime(df['created_at'])
+    df['created_at'] = pd.to_datetime(df['created_at'].apply(lambda x: parser.parse(x)))  # str to datetime type
     df['Date'] = df['created_at'].dt.date
-    # Drop extra columns
+
+    # Drop the extra Latitude and Longitude columns as they're not needed for further analysis
     df.drop(['Latitude', 'Longitude'], axis=1, inplace=True)
+
+    # Calculate the mean PM2.5 and PM10 values
+    df["Mean PM2.5"] = (df["Sensor1 PM2.5_CF_1_ug/m3"] + df["Sensor2 PM2.5_CF_1_ug/m3"]) / 2
+    df["Mean PM10"] = (df["Sensor1 PM10_CF_1_ug/m3"] + df["Sensor2 PM10_CF_1_ug/m3"]) / 2
+
+    # Drop the 'entry_id' column if it's not necessary
+    df.drop(columns=["entry_id"], inplace=True, errors='ignore')
+
+    # Reset index for neatness
     df.reset_index(drop=True, inplace=True)
 
     return df
@@ -162,6 +171,73 @@ def create_dates(start, end):
 
     return df, days_between_df_dates, first_date_in_df, last_date_in_df
 # df, days_between_df_dates, first_date_in_df, last_date_in_df = create_dates(start, end)
+
+
+"""
+Retriving the data by fetching the max number of records at a time
+"""
+from datetime import datetime
+def fetch_all_records(channel_id, api_key, start_date, end_date):
+    current_end = end_date  # Start fetching from the end date
+    all_data = []  # List to store all fetched data
+
+    while True:
+        # Generate the URL for the current chunk
+        url = (
+            f"https://thingspeak.com/channels/{channel_id}/feeds.json?"
+            f"start={start_date}T00:00:00Z&end={current_end}T23:59:59Z&api_key={api_key}&results=8000"
+        )
+        response = requests.get(url)
+        data = response.json()
+
+        # Get the feeds from the response
+        feeds = data.get("feeds", [])
+        if not feeds:
+            print("No more feeds to fetch.")
+            break
+
+        # Append feeds to the all_data list
+        all_data.extend(feeds)
+
+        # Check if the number of feeds is less than the maximum limit (8000)
+        if len(feeds) < 8000:
+            print(f"Fetched {len(feeds)} records in the last batch. All records retrieved.")
+            break
+
+        # Get the timestamp of the first record in this chunk
+        first_timestamp = feeds[0]["created_at"]
+        first_datetime = datetime.strptime(first_timestamp, "%Y-%m-%dT%H:%M:%SZ")
+
+        # Stop if the first record's timestamp is earlier than or equal to the start_date
+        if first_datetime <= datetime.strptime(start_date, "%Y-%m-%d"):
+            print("Fetched all records up to the start date.")
+            break
+
+        # Update the end time for the next request
+        current_end = first_datetime.strftime("%Y-%m-%dT%H:%M:%S")
+        print(f"Fetching next chunk up to {current_end}")
+
+    # Convert the collected data into a Pandas DataFrame
+    df = pd.DataFrame(all_data)
+
+    # Check if 'entry_id' column exists before dropping NAs
+    if 'entry_id' in df.columns:
+        # delete na entry_id
+        df = df.dropna(subset=['entry_id'])
+
+        # organise based i=on entry_id
+        df = df.sort_values(by='entry_id')
+        df.reset_index(drop=True, inplace=True)
+
+        # delete duplicate entry_id
+        df = df.drop_duplicates(subset='entry_id', keep='first')
+        df.reset_index(drop=True, inplace=True)
+    else:
+        # print row without entry_id
+        print("Warning: 'entry_id' column not found in the data.")
+
+    # print(df)
+    return df
 
 
 
@@ -336,39 +412,49 @@ def airqloudlist(filepath, excelfile, airQlouds, deviceNames):
 
 """## initializing dataframe"""
 def process_data(df, start, end):
-    all_data = []
-    weekly_df, analysis_duration, first_date_in_df, last_date_in_df = create_dates(start, end)
+    all_data = []  # List to store data for all devices
 
     for index, row in df.iterrows():
         deviceNumber = row['Device Number']
         readKey = row['Read Key']
         deviceID = row['Device ID']
-        deviceDataFrame = pd.DataFrame()
+        deviceDataFrame = pd.DataFrame()  # Initialize an empty DataFrame for each device
 
-        for i in range(len(weekly_df) - 1):
-            # Generate URL for data request
-            deviceURL = url(deviceID, readKey, weekly_df.loc[i, 'Date'], weekly_df.loc[i + 1, 'Date'])
-            dataRequest = requests.get(deviceURL)
-            data = json.loads(dataRequest.text)
+        # Fetch the raw data for this device
+        raw_data = fetch_all_records(deviceID, readKey, start, end)
 
-            # Extract feed data
-            feeds_data = data['feeds']
+        # Preprocess the data
+        if raw_data.empty:
+            print(f"No data found for Device Number {deviceNumber}")
+            continue  # Skip empty datasets
 
-            if feeds_data:
-                processedData = preprocessing(data)
-                deviceDataFrame = pd.concat([deviceDataFrame, processedData], ignore_index=True)
+        # Preprocessing the raw data
+        deviceDataFrame = preprocessing(raw_data)
 
-        # Add device number column
+        # Check if deviceDataFrame is not empty
         if not deviceDataFrame.empty:
+            # Add Device Number as a column
             deviceDataFrame['Device Number'] = deviceNumber
-            all_data.append(deviceDataFrame)
-        print("Done", deviceNumber)
+            all_data.append(deviceDataFrame)  # Append the processed data to the list
+            print("Done", deviceNumber)
+        else:
+            print(f"No valid data for Device Number {deviceNumber}")
 
-    # Concatenate all data into a single DataFrame
-    final_df = pd.concat(all_data, ignore_index=True)
-    final_df = pd.merge(final_df, df, on=['Device Number'])
+    # Concatenate all device data into one DataFrame
+    if all_data:
+        final_df = pd.concat(all_data, ignore_index=True)
+    else:
+        final_df = pd.DataFrame()  # If all_data is empty, return an empty DataFrame
+
+    # Merge with the original AQData based on 'Device Number'
+    if not final_df.empty:
+        final_df = pd.merge(final_df, df, on=['Device Number'], how='left')
+    else:
+        print("Final DataFrame is empty after concatenation.")
+
     return final_df
 # final_df = process_data(AQData, start, end)
+
 
 
 """## Device time off"""
