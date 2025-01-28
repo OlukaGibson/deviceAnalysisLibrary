@@ -1,3 +1,4 @@
 .env
 libenv/
 venv/
+.pypirc
