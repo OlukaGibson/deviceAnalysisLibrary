@@ -122,8 +122,8 @@ def preprocessing(df):
 """## Create the weekly data"""
 def calculate_days_between(start, end):
     # Convert the date strings to datetime objects
-    start_date = datetime.datetime.strptime(start, '%Y-%m-%d')
-    end_date = datetime.datetime.strptime(end, '%Y-%m-%d')
+    start_date = datetime.strptime(start, '%Y-%m-%d')
+    end_date = datetime.strptime(end, '%Y-%m-%d')
 
     # Calculate the difference in days
     delta = end_date - start_date
@@ -180,6 +180,9 @@ from datetime import datetime
 def fetch_all_records(channel_id, api_key, start_date, end_date):
     current_end = end_date  # Start fetching from the end date
     all_data = []  # List to store all fetched data
+
+    #converting channel_id to string
+    channel_id = str(channel_id)
 
     while True:
         # Generate the URL for the current chunk
@@ -481,14 +484,12 @@ def timeLastPost(df):
 
         # Extract and parse the created_at timestamp
         created_at_str = lastData['feeds'][0]['created_at']
-        created_at = datetime.datetime.strptime(created_at_str, '%Y-%m-%dT%H:%M:%SZ')
+        created_at = datetime.strptime(created_at_str, '%Y-%m-%dT%H:%M:%SZ')
 
-        # Calculate time difference
-        current_time = datetime.datetime.utcnow()
+        current_time = datetime.utcnow()
         time_difference = current_time - created_at
+        time_diff_flag = 1 if time_difference < timedelta(days=1) else 0
 
-        # Flag based on time difference
-        time_diff_flag = 1 if time_difference < datetime.timedelta(days=1) else 0
 
         results.append({
             'Device Number': deviceNumber,
