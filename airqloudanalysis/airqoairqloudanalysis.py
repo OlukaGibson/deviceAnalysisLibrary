@@ -379,13 +379,14 @@ def airqloudlist(filepath, excelfile, airQlouds, deviceNames):
     return "airQlouds and deviceNames  can not both have data"
 
   # Check if either list is empty
-  if len(airQlouds) > 0 :
+  if len(airQlouds) > 0:
     for sheet_name in excelfile.sheet_names:
-      for AirQloud in airQlouds:
+      for AirQloud in airQlouds: 
         if sheet_name == AirQloud:
           df = pd.read_excel(filepath, sheet_name=sheet_name)
           df['AirQloud'] = sheet_name
           df = df[['Device Number', 'Read Key', 'Device ID', 'AirQloud']]
+          df = df.astype({'Device Number': str, 'Read Key': str, 'Device ID': str, 'AirQloud': str})
           dfs.append(df)
 
     AQData = pd.concat(dfs, ignore_index=True)
@@ -396,6 +397,7 @@ def airqloudlist(filepath, excelfile, airQlouds, deviceNames):
       df = pd.read_excel(filepath, sheet_name=sheet_name)
       df['AirQloud'] = sheet_name
       df = df[['Device Number', 'Read Key', 'Device ID', 'AirQloud']]
+      df = df.astype({'Device Number': str, 'Read Key': str, 'Device ID': str, 'AirQloud': str})
       dfs.append(df)
 
     AQData = pd.concat(dfs, ignore_index=True)
