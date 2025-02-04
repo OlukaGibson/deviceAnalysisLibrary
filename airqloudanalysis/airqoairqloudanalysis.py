@@ -271,7 +271,8 @@ def getDeviceData(token):
 #getDeviceData("your_token")
 
 def getSiteData(token):
-  url = str(baseApiURL) + "/metadata/grids?token=" + str(token)
+#   url = str(baseApiURL) + "/metadata/grids?token=" + str(token)
+  url = str(baseApiURL) + "/grids/summary?token=" + str(token)
   response = requests.request("GET", url)
   # print(response.json())
   return response.json()
@@ -469,6 +470,7 @@ def timeLastPost(df):
         deviceNumber = row['Device Number']
         readKey = row['Read Key']
         deviceID = row['Device ID']
+        airqloud = row['AirQloud']
         last = lastUrl(deviceID, readKey)
 
         # Fetch data from the API
@@ -496,7 +498,8 @@ def timeLastPost(df):
         results.append({
             'Device Number': deviceNumber,
             'Time Difference Flag': time_diff_flag,
-            'Time Difference': time_difference
+            'Time Difference': time_difference,
+            'AirQloud': airqloud
         })
 
     result_df = pd.DataFrame(results)
@@ -513,6 +516,7 @@ def calculate_uptime(df):
     device_uptime = []
     device_completeness = []
     device_list = []
+    airqloud_list = []
     optimal_completeness_lst = []
     good_completeness_lst = []
     fair_completeness_lst = []
@@ -554,6 +558,7 @@ def calculate_uptime(df):
 
         # Append results to lists
         device_list.append(deviceNumber)
+        airqloud_list.append(device_df['AirQloud'].iloc[0])
         average_device_uptime.append(average_uptime)
         device_uptime.append(uptime_df)
         device_completeness.append(completeness_df)
@@ -649,7 +654,9 @@ def print_devices_with_time_diff_flag_zero(df, airQlouds, deviceNames):
       for airqloud, group in filtered_df.groupby('AirQloud'):
         print(f"AirQloud: {airqloud}")
         for device in group['Device Number']:
-            print(f"  Device Number: {device}")
+            # print(f"  Device Number: {device}")
+            # print(f"  AirQloud: {airqloud}")
+            print(f"  Device Number: {device}   AirQloud: {airqloud}")
 
         print("------------------------")
         print("")
