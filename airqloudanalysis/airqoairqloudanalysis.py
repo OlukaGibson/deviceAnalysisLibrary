@@ -651,12 +651,11 @@ def print_devices_with_time_diff_flag_zero(df, airQlouds, deviceNames):
 
     if len(airQlouds) > 0:
       # Group by AirQloud and print the devices
-      for airqloud, group in filtered_df.groupby('AirQloud'):
+      for airqloud, group, time_diff in filtered_df.groupby('AirQloud'):
         print(f"AirQloud: {airqloud}")
         for device in group['Device Number']:
             # print(f"  Device Number: {device}")
-            # print(f"  AirQloud: {airqloud}")
-            print(f"  Device Number: {device}   AirQloud: {airqloud}")
+            print(f"  Device Number: {device} --> {time_diff}")
 
         print("------------------------")
         print("")
