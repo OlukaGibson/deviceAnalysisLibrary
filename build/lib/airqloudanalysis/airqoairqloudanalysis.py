@@ -4,6 +4,7 @@ from pandas import json_normalize
 import requests
 import pandas as pd
 import time
+import glob
 import os
 from os import read
 
@@ -461,6 +462,113 @@ def process_data(df, start, end):
     return final_df
 # final_df = process_data(AQData, start, end)
 
+def process_data_function(df, startdate, enddate, airqlouds_csv):
+    additional_data = []
+
+    for airqloud in df['AirQloud'].unique():
+        airqloud_df = df[df['AirQloud'] == airqloud]
+        airqloud_name = f"*{airqloud}*"
+        matching_file = glob.glob(os.path.join(airqlouds_csv, airqloud_name))
+        
+        if matching_file:
+            existing_data = pd.read_csv(matching_file[0])
+            existing_start = existing_data['Date'].min()
+            existing_end = existing_data['Date'].max()
+
+            # dates are aligned with the existing data
+            if existing_start == startdate and existing_end == enddate:
+                return existing_data
+
+            # data starts after startdate and ends after enddate
+            if startdate > existing_start and enddate > existing_end:
+                new_data = process_data(airqloud_df, existing_end, enddate)
+                additional_data.append(new_data)
+                updated_data = pd.concat([existing_data, new_data])
+
+            # data starts before startdate and ends before enddate    
+            elif startdate < existing_start and enddate < existing_end:
+                new_data = process_data(airqloud_df, startdate, existing_start)
+                additional_data.append(new_data)
+                updated_data = pd.concat([existing_data, new_data])
+
+            # data starts after startdate and ends before enddate
+            elif startdate > existing_start and enddate < existing_end:
+                new_data_start = process_data(airqloud_df, existing_end, enddate)
+                new_data_end = process_data(airqloud_df, startdate, existing_start)
+                additional_data.extend([new_data_start, new_data_end])
+                updated_data = pd.concat([new_data_start, existing_data, new_data_end])
+
+            # data starts before startdate and ends after enddate
+            elif startdate < existing_start and enddate > existing_end:
+                pass
+
+            finaldf = pd.concat([existing_data] + additional_data) if additional_data else existing_data
+            # get the data in the range of the startdate and enddate
+            finaldf = finaldf[(finaldf['Date'] >= startdate) & (finaldf['Date'] <= enddate)]
+
+# def process_data_function(df, startdate, enddate, airqlouds_csv):
+#     #  for deviceNumber in df['Device Number'].unique():
+#     for airqloud in df['AirQloud'].unique():
+#         filename = f"{airqlouds_csv}/{startdate}_{enddate}_{airqloud}.csv"
+#         try:
+#             existing_data = pd.read_csv(filename)
+#             existing_start = existing_data['Date'].min()
+#             existing_end = existing_data['Date'].max()
+
+#             if existing_start == startdate and existing_end == enddate:
+#                 return existing_data
+
+#             additional_data = []
+
+#             if startdate > existing_start and enddate > existing_end:
+#                 new_data = process_data(df, existing_end, enddate)
+#                 additional_data.append(new_data)
+#                 updated_data = pd.concat([existing_data, new_data])
+
+
+# def process_data_function(df, startdate, enddate, airqloud):
+#     filename = f"/content/drive/MyDrive/{startdate}_{enddate}_{airqloud}.csv"
+    
+#     try:
+#         existing_data = pd.read_csv(filename)
+#         existing_start = existing_data['timestamp'].min()
+#         existing_end = existing_data['timestamp'].max()
+        
+#         if existing_start == startdate and existing_end == enddate:
+#             return existing_data  # Return as DataFrame
+        
+#         additional_data = []
+        
+#         if startdate > existing_start and enddate > existing_end:
+#             new_data = fetch_data(existing_end, enddate, airqloud)
+#             additional_data.append(new_data)
+#             new_filename = f"/content/drive/MyDrive/{startdate}_{enddate}_{airqloud}.csv"
+#             updated_data = pd.concat([existing_data, new_data])
+#             updated_data.to_csv(new_filename, index=False)
+        
+#         elif startdate < existing_start and enddate < existing_end:
+#             new_data = fetch_data(startdate, existing_start, airqloud)
+#             additional_data.append(new_data)
+#             new_filename = f"/content/drive/MyDrive/{startdate}_{enddate}_{airqloud}.csv"
+#             updated_data = pd.concat([new_data, existing_data])
+#             updated_data.to_csv(new_filename, index=False)
+        
+#         elif startdate > existing_start and enddate < existing_end:
+#             new_data_start = fetch_data(existing_end, enddate, airqloud)
+#             new_data_end = fetch_data(startdate, existing_start, airqloud)
+#             additional_data.extend([new_data_start, new_data_end])
+#             new_filename = f"/content/drive/MyDrive/{startdate}_{enddate}_{airqloud}.csv"
+#             updated_data = pd.concat([new_data_start, existing_data, new_data_end])
+#             updated_data.to_csv(new_filename, index=False)
+        
+#         elif startdate < existing_start and enddate > existing_end:
+#             pass  # No action needed
+        
+#         return pd.concat([existing_data] + additional_data) if additional_data else existing_data
+#     except FileNotFoundError:
+#         new_data = fetch_data(startdate, enddate, airqloud)
+#         new_data.to_csv(filename, index=False)
+#         return new_data
 
 
 """## Device time off"""
@@ -509,7 +617,7 @@ def timeLastPost(df):
 
 """## Uptime variable  initialisation"""
 # Function to calculate the average uptime of the devices
-def calculate_uptime(df):
+def calculate_uptime(df, start, end):
     # Initialize lists to store results
     average_device_uptime = []
     average_completeness_lst = []
@@ -546,7 +654,9 @@ def calculate_uptime(df):
 
 
         # Calculate average uptime
-        average_uptime = round(uptime_df['uptime'].mean(), 2)
+        # average_uptime = round(uptime_df['uptime'].mean(), 2)
+        # calculate average uptime is the sum of the uptime divided by the number of days between the start and end date which are strings
+        average_uptime = round(uptime_df['uptime'].sum() / (aqa.calculate_days_between(start, end) + 1), 2)
         average_completeness = round(completeness_df['data_entries'].mean(), 2)
         average_error = round(error_df['error'].mean(), 2)
 
@@ -586,7 +696,7 @@ def calculate_uptime(df):
     })
 
     return result_df
-# final_uptime_data = calculate_uptime(final_df)
+# final_uptime_data = calculate_uptime(final_df, start, end)
 
 
 
@@ -651,12 +761,11 @@ def print_devices_with_time_diff_flag_zero(df, airQlouds, deviceNames):
 
     if len(airQlouds) > 0:
       # Group by AirQloud and print the devices
-      for airqloud, group in filtered_df.groupby('AirQloud'):
+      for airqloud, group, time_diff in filtered_df.groupby('AirQloud'):
         print(f"AirQloud: {airqloud}")
         for device in group['Device Number']:
             # print(f"  Device Number: {device}")
-            # print(f"  AirQloud: {airqloud}")
-            print(f"  Device Number: {device}   AirQloud: {airqloud}")
+            print(f"  Device Number: {device} --> {time_diff}")
 
         print("------------------------")
         print("")
