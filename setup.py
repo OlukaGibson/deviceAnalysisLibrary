@@ -1,10 +1,13 @@
 from setuptools import setup, find_packages
 import codecs
 import os
+import pathlib
+HERE = pathlib.Path(__file__).parent
+README = (HERE / "README.md").read_text()
 
-VERSION = '0.0.729'
+VERSION = '0.0.730'
 DESCRIPTION = 'This is used for analyzing the obtain from IoT AirQo devices'
-LONG_DESCRIPTION = 'This uses data from IoT AirQo devices to analyze the data and provide insights like sensor health, device uptime, data completeness, etc. and below is the documentation https://docs.google.com/document/d/1Dc4zQceYjoXDwmHKy99hp7x49kq8LtoSAXBA-1HMwA4/edit?usp=sharing'
+LONG_DESCRIPTION = README 
 
 # Setting up
 setup(
@@ -13,6 +16,9 @@ setup(
     author="AirQo",
     author_email="<gibson@airqo.net>",
     description=DESCRIPTION,
+    long_description=README,
+    long_description_content_type="text/markdown",
+    url="https://github.com/OlukaGibson/deviceAnalysisLibrary.git",
     packages=find_packages(),
     install_requires=['numpy', 'pandas', 'requests', 'pytz', 'python-dateutil', 'beautifulsoup4', 'matplotlib', 'seaborn', 'plotly', 'cufflinks'],
     keywords=['python', 'IoT', 'AirQo', 'data', 'analysis', 'insights'],
