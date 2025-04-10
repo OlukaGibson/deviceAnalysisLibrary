@@ -614,6 +614,17 @@ def timeLastPost(df):
     return result_df
 # device_time_diff = timeLastPost(AQData)
 
+def onlineDeviceList(df):
+    # Filter the DataFrame to only include rows where Time Difference Flag is 1
+    filtered_df = df[df['Time Difference Flag'] == 0]
+
+    return filtered_df
+
+def offlineDeviceList(df):
+    # Filter the DataFrame to only include rows where Time Difference Flag is 0
+    filtered_df = df[df['Time Difference Flag'] == 1]
+
+    return filtered_df
 
 """## Uptime variable  initialisation"""
 # Function to calculate the average uptime of the devices
