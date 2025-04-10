@@ -616,13 +616,13 @@ def timeLastPost(df):
 
 def onlineDeviceList(df):
     # Filter the DataFrame to only include rows where Time Difference Flag is 1
-    filtered_df = df[df['Time Difference Flag'] == 0]
+    filtered_df = df[df['Time Difference Flag'] == 1]
 
     return filtered_df
 
 def offlineDeviceList(df):
     # Filter the DataFrame to only include rows where Time Difference Flag is 0
-    filtered_df = df[df['Time Difference Flag'] == 1]
+    filtered_df = df[df['Time Difference Flag'] == 0]
 
     return filtered_df
 
