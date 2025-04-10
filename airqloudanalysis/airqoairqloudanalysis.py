@@ -667,7 +667,7 @@ def calculate_uptime(df, start, end):
         # Calculate average uptime
         # average_uptime = round(uptime_df['uptime'].mean(), 2)
         # calculate average uptime is the sum of the uptime divided by the number of days between the start and end date which are strings
-        average_uptime = round(uptime_df['uptime'].sum() / (aqa.calculate_days_between(start, end) + 1), 2)
+        average_uptime = round(uptime_df['uptime'].sum() / (calculate_days_between(start, end) + 1), 2)
         average_completeness = round(completeness_df['data_entries'].mean(), 2)
         average_error = round(error_df['error'].mean(), 2)
 
