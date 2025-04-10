@@ -23,9 +23,17 @@ import airqloudanalysis as aqa
 
 # Initialize with your API token
 token = "your_api_token"
+for google sheets
+file_path = "file path"
+
 airQlouds = ["Kampala", "Nairobi"]
+or 
+deviceNames = ['aq_g4_95', 'aq_23']
+
 start = "2023-01-01"
 end = "2023-01-31"
+maintenenceDate = date(2025, 3, 1)
+
 
 # Get device data
 df = aqa.airqloudlist_api(token, airQlouds)
