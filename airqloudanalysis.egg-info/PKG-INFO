@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: airqloudanalysis
-Version: 0.0.731
+Version: 0.0.732
 Summary: This is used for analyzing the obtain from IoT AirQo devices
 Home-page: https://github.com/OlukaGibson/deviceAnalysisLibrary.git
 Author: AirQo
@@ -42,8 +42,25 @@ pip install airqloudanalysis
 - Battery performance analysis
 - Support for device-specific and AirQloud-level analysis
 
-## Usage
 
+## Noticable changes to this library
+Library version change
+The library version holds various changes to the following functions;
+
+### Calculate_uptime
+Altered to use start and end date to fill in the null while computing the collective uptime  and now takes in two extra parameters: start and end date 
+    Function call is calculate_uptime(dataframe df, string start, string end)
+
+### Online devices list 
+This provides a variation of the timeLastPost function providing a list of online devices, their device numbers, time difference, and the airqlouds they belong to
+    Function call is onlineDeviceList(dataframe df):
+
+### Offline devices list
+This provides a variation of the timeLastPost function providing a list of offline devices, their device numbers, time difference, and the airqlouds they belong to
+    Function call is offlineDeviceList(dataframe df):
+
+## Usage
+These are the essential functions used both in general and device specific analysis
 ```python
 import airqloudanalysis as aqa
 
@@ -62,37 +79,27 @@ maintenenceDate = date(2025, 3, 1)
 
 
 # Get device data
-df = aqa.airqloudlist_api(token, airQlouds)
+AQData = aqa.airqloudlist(file_path, excel_file, airQlouds, deviceNames)
 
-# Process data for the specified date range
-processed_data = aqa.process_data(df, start, end)
+#Initialisation of the data frame
+final_df = aqa.process_data(AQData, start, end)
+
+#List of devices and last post
+device_time_diff = aqa.timeLastPost(AQData)
+
+#List of online devices
+onlineDeviceList = aqa.onlineDeviceList(device_time_diff)
+
+#List of offline devices
+offlineDeviceList = aqa.offlineDeviceList(device_time_diff)
+
+#Calculating the uptime
+final_uptime_data = aqa.calculate_uptime(final_df, start, end)
 
 # Calculate uptime
 uptime_data = aqa.calculate_uptime(processed_data, start, end)
 
-# Create summary
-device_time_diff = aqa.timeLastPost(df)
-summary = aqa.create_summary_df(df, device_time_diff, uptime_data)
-
-# Generate reports
-summary_report = aqa.export_summary_csv_api(summary, airQlouds, [])
 ```
-
-## Noticable changes to this library
-Library version change
-The library version holds various changes to the following functions;
-
-### Calculate_uptime
-Altered to use start and end date to fill in the null while computing the collective uptime  and now takes in two extra parameters: start and end date 
-    Function call is calculate_uptime(dataframe df, string start, string end)
-
-### Online devices list 
-This provides a variation of the timeLastPost function providing a list of online devices, their device numbers, time difference, and the airqlouds they belong to
-    Function call is onlineDeviceList(dataframe df):
-
-### Offline devices list
-This provides a variation of the timeLastPost function providing a list of offline devices, their device numbers, time difference, and the airqlouds they belong to
-    Function call is offlineDeviceList(dataframe df):
 
 ## Full Documentation
 
