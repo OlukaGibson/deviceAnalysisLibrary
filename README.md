@@ -20,6 +20,8 @@ pip install airqloudanalysis
 ## Noticable changes to this library
 Library version change
 The library version holds various changes to the following functions;
+## print_devices_with_time_diff_flag_zero
+This function has been replaced by the offline and online fuctions as they are more descriptive
 
 ### Calculate_uptime
 Altered to use start and end date to fill in the null while computing the collective uptime  and now takes in two extra parameters: start and end date 

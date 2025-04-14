@@ -758,39 +758,39 @@ def create_summary_df(AQData, time_last_post_df, calculate_uptime_df):
 
 
 """## Off devices"""
-def print_devices_with_time_diff_flag_zero(df, airQlouds, deviceNames):
-    # Check if both lists are empty
-    if len(airQlouds) > 0 and len(deviceNames) > 0:
-      return "airQlouds and deviceNames  can not both have data"
+# def print_devices_with_time_diff_flag_zero(df, airQlouds, deviceNames):
+#     # Check if both lists are empty
+#     if len(airQlouds) > 0 and len(deviceNames) > 0:
+#       return "airQlouds and deviceNames  can not both have data"
 
-    # Ensure df is a DataFrame
-    if not isinstance(df, pd.DataFrame):
-        raise ValueError("df must be a pandas DataFrame")
+#     # Ensure df is a DataFrame
+#     if not isinstance(df, pd.DataFrame):
+#         raise ValueError("df must be a pandas DataFrame")
 
-    # Filter the DataFrame to only include rows where Time Difference Flag is 0
-    filtered_df = df[df['Time Difference Flag'] == 0]
+#     # Filter the DataFrame to only include rows where Time Difference Flag is 0
+#     filtered_df = df[df['Time Difference Flag'] == 0]
 
-    if len(airQlouds) > 0:
-      # Group by AirQloud and print the devices
-      for airqloud, group, time_diff in filtered_df.groupby('AirQloud'):
-        print(f"AirQloud: {airqloud}")
-        for device in group['Device Number']:
-            # print(f"  Device Number: {device}")
-            print(f"  Device Number: {device} --> {time_diff}")
+#     if len(airQlouds) > 0:
+#       # Group by AirQloud and print the devices
+#       for airqloud, group, time_diff in filtered_df.groupby('AirQloud'):
+#         print(f"AirQloud: {airqloud}")
+#         for device in group['Device Number']:
+#             # print(f"  Device Number: {device}")
+#             print(f"  Device Number: {device} --> {time_diff}")
 
-        print("------------------------")
-        print("")
+#         print("------------------------")
+#         print("")
 
-    elif len(deviceNames) > 0:
-      # Group by AirQloud and print the devices
-      print("Off line devices")
-      for airqloud, group in filtered_df.groupby('Device Number'):
-        for device in group['Device Number']:
-            print(f"  Device Number: {device}")
-        print("")
-    else:
-      return "either airQlouds or deviceNames must have data"
-# print_devices_with_time_diff_flag_zero(summary_df, airQlouds, deviceNames)
+#     elif len(deviceNames) > 0:
+#       # Group by AirQloud and print the devices
+#       print("Off line devices")
+#       for airqloud, group in filtered_df.groupby('Device Number'):
+#         for device in group['Device Number']:
+#             print(f"  Device Number: {device}")
+#         print("")
+#     else:
+#       return "either airQlouds or deviceNames must have data"
+# # print_devices_with_time_diff_flag_zero(summary_df, airQlouds, deviceNames)
 
 def print_devices_with_time_diff_flag_zero_api(df, airQlouds, deviceNames):
     # Check if both lists are populated
@@ -874,7 +874,7 @@ def export_summary_csv(summary_df, output_file, airQlouds, deviceNames):
     summary_grouped = summary_grouped.rename(columns={
         'Off': 'Devices Off',
         'On': 'Devices On',
-        'Completeness': 'Hourly Completeness',
+        'Completeness': 'Average Hourly Entries',
         'Optimal': 'Optimal Completeness (%)',
         'Good': 'Good Completeness (%)',
         'Fair': 'Fair Completeness (%)',
@@ -939,7 +939,7 @@ def export_summary_csv_api(summary_df, airQlouds, deviceNames):
     summary_grouped = summary_grouped.rename(columns={
         'Off': 'Devices Off',
         'On': 'Devices On',
-        'Completeness': 'Hourly Completeness',
+        'Completeness': 'Average Hourly Entries',
         'Optimal': 'Optimal Completeness (%)',
         'Good': 'Good Completeness (%)',
         'Fair': 'Fair Completeness (%)',
