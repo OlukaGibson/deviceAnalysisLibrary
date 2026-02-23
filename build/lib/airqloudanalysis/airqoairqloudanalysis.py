@@ -954,15 +954,39 @@ def plot_uptime_by_device(summary_df):
     if not isinstance(summary_df, pd.DataFrame):
         raise ValueError("summary_df must be a pandas DataFrame")
 
-    uptime_data = summary_df.groupby('Device Number').agg(
+    # Aggregate by AirQloud and Device Number
+    uptime_data = summary_df.groupby(['AirQloud', 'Device Number']).agg(
         Uptime=('Average Uptime', lambda x: round((x.mean() / 24) * 100, 2))
     ).reset_index()
 
-    fig = px.bar(uptime_data, x='Device Number', y='Uptime', title='Uptime for Each Device',
+    if uptime_data.empty:
+        print("No data available to plot.")
+        return
+
+    # Calculate number of rows for 3 columns (ceiling division)
+    num_airqlouds = uptime_data['AirQloud'].nunique()
+    if num_airqlouds > 0:
+        num_rows = (num_airqlouds + 2) // 3
+        # Increase minimum height and per-row height multiplier (e.g., to 500)
+        # to ensure sufficient space for labels
+        height = max(700, num_rows * 500)
+    else:
+        height = 700
+
+    fig = px.bar(uptime_data, x='Device Number', y='Uptime',
+                 facet_col='AirQloud', facet_col_wrap=3,
+                 # Increase row spacing to prevent device names from overlapping the plot below
+                 facet_row_spacing=0.05,
+                 title='Uptime for Devices by AirQloud',
                  labels={'Uptime': 'Uptime (%)', 'Device Number': 'Device Number'},
                  text='Uptime')
 
-    fig.update_layout(height=600, width=1200, showlegend=False,)
+    # Update axes to be independent so each subplot only shows its relevant devices
+    fig.update_xaxes(matches=None, showticklabels=True)
+    fig.update_yaxes(matches=None, showticklabels=True)
+
+    # Adjust layout
+    fig.update_layout(height=height, width=1200, showlegend=False)
     fig.show(renderer='colab')
 # plot_uptime_by_device(summary_df)
 
@@ -974,6 +998,78 @@ def plot_uptime_by_device_api(summary_df):
     ).reset_index()
     return uptime_data
 # uptime_data = plot_uptime_by_device_api(summary_df)
+
+"""## Accuracy Metrics"""
+def calculate_accuracy_metrics(df, sensor1_col='Sensor1 PM2.5_CF_1_ug/m3', sensor2_col='Sensor2 PM2.5_CF_1_ug/m3', output_csv=None):
+    results = []
+
+    # Check if columns exist in the DataFrame
+    if sensor1_col not in df.columns:
+        print(f"Error: Sensor 1 column '{sensor1_col}' not found in DataFrame.")
+        return pd.DataFrame() 
+    if sensor2_col not in df.columns:
+        print(f"Error: Sensor 2 column '{sensor2_col}' not found in DataFrame.")
+        return pd.DataFrame() 
+
+    for device_number, group in df.groupby('Device Number'):
+        # Filter for rows where both sensors have valid (non-null) data
+        valid_data = group.dropna(subset=[sensor1_col, sensor2_col])
+
+        if valid_data.empty:
+            continue
+
+        s1 = valid_data[sensor1_col]
+        # We treat Sensor 2 as the 'reference' for the sake of the formulas
+        s2 = valid_data[sensor2_col] 
+
+        # Calculate differences (Sensor 1 - Sensor 2)
+        diff = s1 - s2
+        abs_diff = diff.abs()
+
+        # Mean Error (ME)
+        me = diff.mean()
+
+        # Mean Absolute Error (MAE)
+        mae = abs_diff.mean()
+
+        # Root Mean Square Error (RMSE)
+        rmse = np.sqrt((diff ** 2).mean())
+
+        # Bias (Same as ME in this context)
+        # The equation Bias = 1/n * Sum(S - R) is identical to Mean Error
+        bias = me
+
+        # Relative Error (%)
+        # Formula: ((S - R) / R) * 100. We use Sensor 2 as R here.
+        with np.errstate(divide='ignore', invalid='ignore'):
+            rel_error = (diff / s2) * 100
+            rel_error = rel_error.replace([np.inf, -np.inf], np.nan)
+        
+        mean_rel_error = rel_error.mean()
+
+        # Get AirQloud if available
+        airqloud = group['AirQloud'].iloc[0] if 'AirQloud' in group.columns else None
+
+        results.append({
+            'Device Number': device_number,
+            'AirQloud': airqloud,
+            'Mean Error': round(me, 2),
+            'MAE': round(mae, 2),
+            'RMSE': round(rmse, 2),
+            'Bias': round(bias, 2),
+            'Relative Error (%)': round(mean_rel_error, 2)
+        })
+
+    results_df = pd.DataFrame(results)
+    
+    if output_csv:
+        results_df.to_csv(output_csv, index=False)
+        print(f"Accuracy metrics saved to {output_csv}")
+        
+    return results_df
+# accuracy_metrics_df = calculate_accuracy_metrics(df, output_csv='accuracy_metrics.csv')
+
+
 
 """## Uptime
 ### Weekly uptime """

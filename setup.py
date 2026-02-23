@@ -5,7 +5,7 @@ import pathlib
 HERE = pathlib.Path(__file__).parent
 README = (HERE / "README.md").read_text()
 
-VERSION = '0.0.733' 
+VERSION = '0.0.734' 
 DESCRIPTION = 'This is used for analyzing the obtain from IoT AirQo devices'
 LONG_DESCRIPTION = README 
 
