@@ -8,8 +8,6 @@ import glob
 import os
 from os import read
 
-from .datainitialisation import create_dates
-
 #Other important libaries for datetime + timezone, OS for interacting with the operating system, requests for sending HTTP requests, BeautifulSoup for web scrapping
 #Str to datetime library
 from pytz import all_timezones
@@ -756,7 +754,7 @@ def format_weekly_completeness_output(weekly_completeness, airQlouds, deviceName
 
 
 """### Weekly data completeness trend"""
-def plot_weekly_completeness(pivot_table, airQlouds, deviceNames):
+def plot_weekly_completness(pivot_table, airQlouds, deviceNames):
     # Check if both lists are empty
     if len(airQlouds) > 0 and len(deviceNames) > 0:
         return "airQlouds and deviceNames cannot both have data"
@@ -783,5 +781,3 @@ def plot_weekly_completeness(pivot_table, airQlouds, deviceNames):
     fig.update_layout(height=600, width=1200, showlegend=False)
     fig.show(renderer='colab')
 # plot_weekly_completness(formatted_weekly_completeness, airQlouds, deviceNames)
-# Alias for backward compatibility
-plot_weekly_completness = plot_weekly_completeness

@@ -8,8 +8,6 @@ import glob
 import os
 from os import read
 
-from .datainitialisation import create_dates
-
 #Other important libaries for datetime + timezone, OS for interacting with the operating system, requests for sending HTTP requests, BeautifulSoup for web scrapping
 #Str to datetime library
 from pytz import all_timezones
