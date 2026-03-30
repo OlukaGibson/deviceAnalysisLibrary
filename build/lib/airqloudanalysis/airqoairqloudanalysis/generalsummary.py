@@ -561,6 +561,26 @@ def format_weekly_device_uptime_output(weekly_uptime):
     return pivot_table
 # formatted_weekly_device_uptime = format_weekly_device_uptime_output(weekly_average_uptime_per_device)
 
+def calculate_daily_average_uptime_per_device(final_df, AQData, start, end):
+    # Calculate daily uptime per device
+    daily_uptime = calculate_daily_uptime_per_device(final_df, AQData, start, end)
+
+    # Convert the daily uptime to a percentage
+    daily_uptime['Daily Uptime (%)'] = (daily_uptime['Daily Uptime (hours)'] / 24) * 100
+
+    return daily_uptime
+# daily_average_uptime_per_device = calculate_daily_average_uptime_per_device(final_df, AQData, start, end)
+
+def format_daily_device_uptime_output(daily_uptime):
+    # Pivot the table to get dates as columns and Device Numbers as rows
+    pivot_table = daily_uptime.pivot(index='Device Number', columns='Date', values='Daily Uptime (%)')
+
+    # Reset the index to make 'Device Number' a column
+    pivot_table.reset_index(inplace=True)
+
+    return pivot_table
+# formatted_daily_device_uptime = format_daily_device_uptime_output(daily_average_uptime_per_device)
+
 
 """### Weekly uptime trends"""
 def plot_weekly_uptime(pivot_table, airQlouds, deviceNames):
